@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>GPT Image OCR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- importante -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-lg bg-white shadow-lg rounded-xl p-6">
+    <h2 class="text-2xl font-bold mb-4 text-center">GPT Image OCR / Description</h2>
+
+    <label class="block font-medium mb-1">API Key:</label>
+    <input type="password" id="apiKey" placeholder="sk-..."
+      class="w-full border border-gray-300 rounded p-2 mb-3 focus:ring focus:ring-blue-200 text-sm sm:text-base">
+
+    <label class="block font-medium mb-1">Modelo:</label>
+    <select id="model"
+      class="w-full border border-gray-300 rounded p-2 mb-3 focus:ring focus:ring-blue-200 text-sm sm:text-base">
+      <option value="gpt-4o-mini">gpt-4o-mini (mais barato)</option>
+      <option value="gpt-4o">gpt-4o (mais qualidade)</option>
+      <option value="gpt-5-mini">gpt-5-mini (novo e barato)</option>
+      <option value="gpt-5">gpt-5 (novo e mais avançado)</option>
+    </select>
+
+    <label class="block font-medium mb-1">Prompt:</label>
+    <textarea id="prompt"
+      class="w-full border border-gray-300 rounded p-2 mb-3 focus:ring focus:ring-blue-200 text-sm sm:text-base"
+      rows="3">Extraia todo o texto dessa imagem e corrija os erros ortográficos e acentuação sem alterar as palavras do texto.</textarea>
+
+    <label class="block font-medium mb-1">Imagens (opcional):</label>
+    <input type="file" id="images" accept="image/*" multiple
+      class="w-full border border-gray-300 rounded p-2 mb-4 focus:ring focus:ring-blue-200 text-sm sm:text-base">
+
+    <button id="generateBtn"
+      class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded transition text-sm sm:text-base">
+      Generate
+    </button>
+
+    <h3 class="text-lg font-semibold mt-6">Output:</h3>
+    <div id="output" class="whitespace-pre-wrap bg-gray-100 p-3 rounded mt-2 text-sm sm:text-base overflow-auto max-h-96"></div>
+  </div>
+
+  <script>
+    document.getElementById("generateBtn").addEventListener("click", async () => {
+      const apiKey = document.getElementById("apiKey").value.trim();
+      const model = document.getElementById("model").value;
+      const prompt = document.getElementById("prompt").value.trim();
+      const files = document.getElementById("images").files;
+      const outputDiv = document.getElementById("output");
+
+      if (!apiKey) return alert("Informe sua API key!");
+      if (!prompt) return alert("Digite um prompt!");
+
+      outputDiv.textContent = "Processando...\n";
+
+      if (files.length === 0) {
+        const textResponse = await callGPT(apiKey, model, prompt, null);
+        outputDiv.textContent += `Resposta (${model}):\n${textResponse}\n`;
+      } else {
+        for (let i = 0; i < files.length; i++) {
+          const base64Image = await toBase64(files[i]);
+          const textResponse = await callGPT(apiKey, model, prompt, base64Image);
+          outputDiv.textContent += `Imagem ${i + 1} (${model}):\n${textResponse}\n\n`;
+        }
+      }
+    });
+
+    async function callGPT(apiKey, model, prompt, base64Image) {
+      try {
+        const messages = [
+          { role: "user", content: [ { type: "text", text: prompt } ] }
+        ];
+        if (base64Image) {
+          messages[0].content.push({
+            type: "image_url",
+            image_url: { url: `data:image/jpeg;base64,${base64Image}` }
+          });
+        }
+
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ model, messages })
+        });
+
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || "Sem resposta.";
+      } catch (err) {
+        console.error(err);
+        return "Erro: " + err.message;
+      }
+    }
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = error => reject(error);
+      });
+    }
+  </script>
+</body>
+</html>
